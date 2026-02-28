@@ -47,7 +47,7 @@ const MOCK_DOCUMENTS = [
     },
 ];
 
-// Simulated base64-encoded PDF (first few bytes of a tiny PDF placeholder)
+// Simulated base64-encoded PDF
 const MOCK_PDF_BASE64 =
     'JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5k' +
     'b2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4K' +
@@ -60,6 +60,10 @@ class MockMeridianLinkClient {
         this.ticketExpiry = null;
         this.uploadedDocs = [];
     }
+
+    /** No-op — mock doesn't need real tickets */
+    setTicketOverride() { }
+    clearTicketOverride() { }
 
     /** Simulate authentication */
     async authenticate() {
@@ -83,7 +87,7 @@ class MockMeridianLinkClient {
         await this._delay(500);
         const docs = MOCK_DOCUMENTS.map((d) => ({
             ...d,
-            guid: uuidv4(), // fresh GUIDs per call
+            guid: uuidv4(),
         }));
         console.log(
             `[MockClient] Listed ${docs.length} documents for loan ${loanNumber}`
