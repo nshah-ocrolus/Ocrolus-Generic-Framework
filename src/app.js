@@ -34,13 +34,13 @@ app.get('/launch', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'launch.html'));
 });
 
-// ── Fallback to dashboard ───────────────────────────
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-});
-
 // ── Start Server (only when running locally, not on Vercel) ──
 if (!process.env.VERCEL) {
+    // Fallback to dashboard (local only — Vercel handles this via vercel.json)
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+    });
+
     app.listen(config.app.port, () => {
         console.log('');
         console.log('╔══════════════════════════════════════════════════════╗');
