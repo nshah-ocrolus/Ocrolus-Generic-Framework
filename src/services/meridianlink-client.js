@@ -41,6 +41,26 @@ class MeridianLinkClient {
 
     this.accessToken = null;
     this.tokenExpiry = null;
+
+    // Generic Framework ticket override
+    // When MeridianLink launches us via the Generic Framework, it provides
+    // an EncryptedTicket that replaces OAuth for EDocsService calls.
+    this.ticketOverride = null;
+  }
+
+  /**
+   * Set a Generic Framework EncryptedTicket to use instead of OAuth.
+   * The ticket XML is passed directly as sTicket in SOAP calls.
+   */
+  setTicketOverride(ticketXml) {
+    this.ticketOverride = ticketXml;
+    console.log('[MeridianLink] Using Generic Framework EncryptedTicket (30 min validity)');
+  }
+
+  /** Clear the ticket override, reverting to OAuth */
+  clearTicketOverride() {
+    this.ticketOverride = null;
+    console.log('[MeridianLink] Cleared ticket override, reverting to OAuth');
   }
 
   // ────────────────────────────────────────────
@@ -49,13 +69,15 @@ class MeridianLinkClient {
 
   /**
    * Obtain an OAuth access token from MeridianLink.
-   *
-   * POST <baseDomain>/oauth/token
-   * Body: { client_id, client_secret }
-   *
-   * Returns: { access_token, token_type, expires_in }
+   * Skipped when using a Generic Framework EncryptedTicket.
    */
   async authenticate() {
+    // If we have a ticket override, skip OAuth entirely
+    if (this.ticketOverride) {
+      console.log('[MeridianLink] Using Generic Framework ticket (OAuth skipped)');
+      return { success: true, tokenType: 'GenericFrameworkTicket', expiresIn: 1800 };
+    }
+
     if (!this.clientId || !this.clientSecret) {
       throw new Error(
         'Missing ML_CLIENT_ID or ML_CLIENT_SECRET. ' +
@@ -68,8 +90,6 @@ class MeridianLinkClient {
 
     const response = await axios.post(
       this.oauthUrl,
-      // Per Vendor Portal Guide: "pass the following three parameters
-      // as urlencoded key-value pairs"
       new URLSearchParams({
         grant_type: 'client_credentials',
         client_id: this.clientId,
@@ -89,18 +109,23 @@ class MeridianLinkClient {
     }
 
     this.accessToken = access_token;
-    // Refresh 5 minutes before expiry for safety
     this.tokenExpiry = Date.now() + (expires_in - 300) * 1000;
 
-    console.log(`[MeridianLink] ✅ OAuth token obtained (expires in ${expires_in}s)`);
+    console.log(`[MeridianLink] OAuth token obtained (expires in ${expires_in}s)`);
     return { success: true, tokenType: token_type, expiresIn: expires_in };
   }
 
   /**
    * Get a valid sTicket for service calls.
-   * Format: "Bearer {access_token}" as documented.
+   *
+   * If a Generic Framework EncryptedTicket is set, the ticket XML is
+   * returned directly (MeridianLink expects the full XML element).
+   * Otherwise, returns "Bearer {access_token}" from OAuth.
    */
   async ensureAuth() {
+    if (this.ticketOverride) {
+      return this.ticketOverride;
+    }
     if (!this.accessToken || Date.now() > this.tokenExpiry) {
       await this.authenticate();
     }
@@ -111,12 +136,6 @@ class MeridianLinkClient {
   //  Document Operations (EDocsService)
   // ────────────────────────────────────────────
 
-  /**
-   * List eDocs for a given loan number.
-   *
-   * Method: ListEdocsByLoanNumber
-   * Domain: Generic Framework base domain
-   */
   async listDocuments(loanNumber) {
     const sTicket = await this.ensureAuth();
 
@@ -153,12 +172,6 @@ class MeridianLinkClient {
     return this._parseDocumentList(result);
   }
 
-  /**
-   * Download a specific eDoc by its document ID.
-   *
-   * Method: DownloadEdocsPdfById
-   * Domain: Generic Framework base domain
-   */
   async downloadDocument(docId) {
     const sTicket = await this.ensureAuth();
 
@@ -199,12 +212,6 @@ class MeridianLinkClient {
     };
   }
 
-  /**
-   * Upload a processed PDF back to MeridianLink.
-   *
-   * Method: UploadPDFDocument
-   * Domain: Generic Framework base domain
-   */
   async uploadDocument(loanNumber, documentType, base64Content, notes = '') {
     const sTicket = await this.ensureAuth();
 
@@ -241,7 +248,7 @@ class MeridianLinkClient {
     const result =
       body?.UploadPDFDocumentResponse?.UploadPDFDocumentResult;
 
-    console.log(`[MeridianLink] ✅ Upload result: ${JSON.stringify(result)}`);
+    console.log(`[MeridianLink] Upload result: ${JSON.stringify(result)}`);
 
     return {
       success: true,
@@ -255,7 +262,6 @@ class MeridianLinkClient {
   //  Helpers
   // ────────────────────────────────────────────
 
-  /** Parse the document list XML from ListEdocsByLoanNumber response */
   _parseDocumentList(raw) {
     if (!raw) return [];
     try {
@@ -287,7 +293,6 @@ class MeridianLinkClient {
     }
   }
 
-  /** Escape special XML characters */
   _escapeXml(str) {
     if (!str) return '';
     return String(str)
