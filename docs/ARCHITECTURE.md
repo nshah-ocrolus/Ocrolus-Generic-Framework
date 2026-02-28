@@ -1,196 +1,229 @@
 # Product Architecture Document
 
-## MeridianLink Generic Framework — Document Integration PoC
+## Ocrolus — MeridianLink Generic Framework Integration
 
-**Version:** 2.0  
-**Framework:** Generic Framework (migrated from SOAP-based Web Services)  
+**Version:** 3.0  
+**Integration Method:** Generic Framework (Launch URL / Pop-Up)  
 **Phase:** 1 — Proof of Concept
 
 ---
 
 ## 1. Overview
 
-This Proof of Concept demonstrates a document processing pipeline between two systems using MeridianLink's **Generic Framework**:
+This Proof of Concept demonstrates a document processing integration between two products in the mortgage industry:
 
-- **Product A (Ocrolus)** — Our document processing system that reviews, categorizes, and validates mortgage documents
-- **Product B (MeridianLink)** — A mortgage industry platform that stores and manages loan documents
+- **Ocrolus (Product A)** — A document processing system that reviews, categorizes, and validates mortgage documents
+- **MeridianLink (Product B)** — A mortgage industry platform (LOS) that stores and manages loan documents
 
-### Data Flow
+### Integration Method
 
-```
-  MeridianLink                  Product A                    MeridianLink
-  (Document Source)             (Processing Engine)          (Document Destination)
-  
-  ┌─────────────┐              ┌──────────────────┐         ┌─────────────┐
-  │  Loan Docs   │ ──RECEIVE──▶│  Review & Process │──SEND──▶│  Processed  │
-  │  (PDFs)      │              │  Documents        │  BACK   │  Documents  │
-  └─────────────┘              └──────────────────┘         └─────────────┘
-```
+We use MeridianLink's **Generic Framework (Hyperlink) integration** — designed for vendors without a dedicated framework. This approach uses a **launch URL mechanism** where MeridianLink triggers the vendor's UI in a pop-up window.
 
-Product A connects to MeridianLink via the **Generic Framework**, pulls mortgage documents (loan applications, paystubs, appraisals, etc.), processes them, and sends the processed results back.
-
----
-
-## 2. Generic Framework Integration
-
-### What is the Generic Framework?
-
-MeridianLink's **Generic Framework** is the modern integration approach that replaces the legacy SOAP-based Web Services model. Key differences:
-
-| Aspect | Legacy (SOAP Web Services) | Generic Framework |
-|--------|---------------------------|-------------------|
-| **Authentication** | `GetUserAuthTicket` per-request credentials | OAuth 2.0 Bearer tokens via `/oauth/token` |
-| **Token Lifetime** | Session-based | 4 hours with auto-refresh |
-| **Base Domain** | Separate domains (webservices, edocs) | Single unified domain |
-| **Sandbox** | N/A | `playrunner.mortgage.meridianlink.com` |
-| **Document Service** | EDocsService.asmx with login credentials | EDocsService.asmx with Bearer token |
+When a MeridianLink user clicks "Ocrolus" inside a loan, a pop-up opens, automatically receives the loan's documents, processes them, and sends them back — all seamlessly.
 
 ### How It Works
 
-The Generic Framework uses **OAuth 2.0 client credentials** for authentication, then passes the Bearer token as the `sTicket` parameter in EDocsService calls:
+```
+  MeridianLink User                MeridianLink LOS                 Ocrolus (Your App)
+  ────────────────                 ────────────────                  ──────────────────
+  1. Clicks "Ocrolus"      ───►   2. POSTs XML to                  3. Parses XML request:
+     in a loan file                  /api/generic-framework/launch      - LoanNumber
+                                                                        - EncryptedTicket
+                                                                        - UserLogin
+                                                                    4. Creates session (30-min TTL)
+                                                                    5. Responds with PopupURL XML
 
+                                   6. Opens pop-up at     ───►     7. Pop-up auto-runs pipeline:
+                                      the PopupURL                     Step 1: Authenticate
+                                                                       Step 2: Receive documents
+                                                                       Step 3: Process documents
+                                                                       Step 4: Return to MeridianLink
+
+                                                                    8. Shows "Done — Close Window"
+  9. Sees processed docs   ◄───   MeridianLink receives            10. postMessage sent to parent
+                                   completion notification
 ```
-  ┌─────────────┐        OAuth 2.0        ┌─────────────┐
-  │  Product A   │ ──── client_id ──────▶  │ MeridianLink │
-  │              │ ──── client_secret ──▶  │  /oauth/token │
-  │              │ ◀── access_token ─────  │              │
-  └──────┬──────┘                          └──────────────┘
-         │
-         │  Bearer {access_token} as sTicket
-         │
-         ▼
-  ┌─────────────────────────────────────────────────┐
-  │  EDocsService.asmx (Generic Framework)              │
-  │  ├── ListEdocsByLoanNumber(sTicket, sLNm)           │
-  │  ├── DownloadEdocsPdfById(sTicket, docId)           │
-  │  └── UploadPDFDocument(sTicket, sLNm, type, data)  │
-  └─────────────────────────────────────────────────┘
+
+---
+
+## 2. XML Handshake Protocol
+
+### Step 1: MeridianLink Sends Request
+
+When a user clicks the vendor link, MeridianLink POSTs this XML to your Launch URL:
+
+```xml
+<LQBGenericFrameworkRequest>
+  <CredentialXML>
+    <credentials username="lenderUser" password="lenderPass" accountID="42" />
+  </CredentialXML>
+  <LoanNumber>LN-2026-001</LoanNumber>
+  <UserLogin>rseward</UserLogin>
+  <LendingQBLoanCredential>
+    <GENERIC_FRAMEWORK_USER_TICKET EncryptedTicket="Pb7NRhW2BAr5Pqz..." />
+  </LendingQBLoanCredential>
+</LQBGenericFrameworkRequest>
 ```
+
+### Step 2: Your App Responds
+
+Your app parses the XML, stores the EncryptedTicket in a session (30-minute TTL), and responds:
+
+```xml
+<LQBGenericFrameworkResponse>
+  <Window url="https://your-server.com/launch?sessionId=UUID&amp;loanNumber=LN-2026-001"
+          height="850" width="650" modalIndicator="Y" />
+</LQBGenericFrameworkResponse>
+```
+
+### Step 3: Pop-Up Opens
+
+MeridianLink opens the PopupURL in a modal window. The pop-up automatically runs the 4-step pipeline.
 
 ---
 
 ## 3. Pipeline Steps
 
-Every integration run follows four steps in order:
+Every integration run follows four steps:
 
-| Step | What Happens | Generic Framework API Used |
-|------|-------------|--------------------------|
-| **1. Authenticate** | Obtain OAuth access token | `POST /oauth/token` with `client_id` + `client_secret` |
-| **2. Receive** | List and download documents for a loan | `ListEdocsByLoanNumber` → `DownloadEdocsPdfById` |
-| **3. Process** | Process each document (Phase 1: placeholder stamps) | Internal — no API call |
-| **4. Return** | Upload processed documents back to the loan | `UploadPDFDocument` |
+| Step | What Happens | Phase 1 Status |
+|------|-------------|----------------|
+| **1. Authenticate** | Use EncryptedTicket from session (or OAuth fallback) | ✅ Mock mode |
+| **2. Receive** | List and download documents for the loan | ✅ Mock mode (5 sample docs) |
+| **3. Process** | Process each document (review, categorize, validate) | ✅ Placeholder |
+| **4. Return** | Upload processed documents back to MeridianLink | ✅ Mock mode |
 
 ---
 
 ## 4. System Architecture
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│                        PoC Application                              │
-│                                                                     │
-│   ┌───────────────┐    ┌─────────────────┐    ┌─────────────────┐  │
-│   │  Web Dashboard │    │   Integration   │    │   REST API      │  │
-│   │  (Visual UI)   │    │   Orchestrator  │    │   (Endpoints)   │  │
-│   └───────────────┘    └────────┬────────┘    └─────────────────┘  │
-│                                 │                                   │
-│                    ┌────────────┼────────────┐                      │
-│                    ▼                         ▼                      │
-│         ┌──────────────────┐     ┌──────────────────┐              │
-│         │  MeridianLink    │     │  Document         │              │
-│         │  Generic Frmwork │     │  Processor         │              │
-│         │  Client          │     │                    │              │
-│         └────────┬─────────┘     └──────────────────┘              │
-│                  │                                                  │
-└──────────────────┼──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          Ocrolus Application                             │
+│                                                                          │
+│   ┌──────────────────┐    ┌───────────────┐    ┌──────────────────────┐ │
+│   │  Admin Dashboard  │    │  Integration  │    │  Generic Framework   │ │
+│   │  (port 4000)      │    │  Orchestrator │    │  XML Endpoint        │ │
+│   │  - Manual trigger │    │  - 4-step     │    │  - Receives XML POST │ │
+│   │  - Job history    │    │    pipeline   │    │  - Session store     │ │
+│   │  - Status view    │    │  - Job mgmt  │    │  - Responds PopupURL │ │
+│   └──────────────────┘    └───────┬───────┘    └──────────────────────┘ │
+│                                   │                                      │
+│                    ┌──────────────┼──────────────┐                       │
+│                    ▼                             ▼                       │
+│         ┌──────────────────┐          ┌──────────────────┐              │
+│         │  MeridianLink    │          │  Document         │              │
+│         │  API Client      │          │  Processor         │              │
+│         │  (OAuth + Ticket)│          │  (Placeholder)     │              │
+│         └────────┬─────────┘          └──────────────────┘              │
+│                  │                                                       │
+│   ┌──────────────────────────────────────────┐                          │
+│   │  Pop-Up Window (launch.html)              │                          │
+│   │  - Auto-starts pipeline                   │                          │
+│   │  - Shows real-time step progress          │                          │
+│   │  - "Done — Close Window" button           │                          │
+│   │  - postMessage to MeridianLink parent     │                          │
+│   └──────────────────────────────────────────┘                          │
+│                  │                                                       │
+└──────────────────┼───────────────────────────────────────────────────────┘
                    │
-                   │ HTTPS / Generic Framework
+                   │ HTTPS
                    ▼
           ┌──────────────────┐
           │   MeridianLink   │
-          │   Cloud Services │
-          │   (PlayRunner    │
-          │    Sandbox)      │
+          │   Cloud (LOS)    │
           └──────────────────┘
 ```
 
-### Component Responsibilities
+---
 
-| Component | Role | Description |
-|-----------|------|-------------|
-| **Web Dashboard** | Visual interface | Browser-based UI to trigger pipelines and watch real-time execution |
-| **Integration Orchestrator** | Central controller | Coordinates the 4-step pipeline, tracks progress, maintains job history |
-| **REST API** | External endpoints | Allows other systems or CLI tools to trigger and monitor pipelines |
-| **MeridianLink Generic Framework Client** | API communication | Handles OAuth auth, XML request/response formatting, and all MeridianLink service calls |
-| **Document Processor** | Processing engine | Placeholder in Phase 1 — production would contain OCR, classification, compliance logic |
+## 5. Component Responsibilities
+
+| Component | Role |
+|-----------|------|
+| **Generic Framework XML Endpoint** | Handles the XML handshake — receives MeridianLink POST, parses loan/ticket, creates session, returns PopupURL |
+| **Pop-Up Window** | The UI that appears inside MeridianLink — shows pipeline progress and sends completion message |
+| **Integration Orchestrator** | Coordinates the 4-step pipeline (Auth → Receive → Process → Return) |
+| **MeridianLink API Client** | Handles OAuth and EncryptedTicket auth, SOAP calls to EDocsService |
+| **Document Processor** | Placeholder in Phase 1 — will contain real Ocrolus processing logic in later phases |
+| **Admin Dashboard** | Internal admin UI for manual testing and job history |
 
 ---
 
-## 5. Generic Framework API Reference
+## 6. File Structure
 
-### 5.1 Authentication
-
-| Detail | Value |
-|--------|-------|
-| **Endpoint** | `POST https://playrunner.mortgage.meridianlink.com/oauth/token` |
-| **Content-Type** | `application/x-www-form-urlencoded` |
-| **Parameters** | `grant_type=client_credentials`, `client_id`, `client_secret` |
-| **Response** | `{ access_token, token_type: "Bearer", expires_in: 14400 }` |
-| **Token Lifetime** | 4 hours (auto-refreshes 5 minutes before expiry) |
-
-### 5.2 List Documents
-
-| Detail | Value |
-|--------|-------|
-| **Endpoint** | `POST https://playrunner.mortgage.meridianlink.com/los/webservice/EDocsService.asmx` |
-| **Method** | `ListEdocsByLoanNumber` |
-| **Parameters** | `sTicket` (Bearer token), `sLNm` (loan number) |
-| **Returns** | XML list of documents with IDs, names, types, folders |
-
-### 5.3 Download Document
-
-| Detail | Value |
-|--------|-------|
-| **Endpoint** | `POST https://playrunner.mortgage.meridianlink.com/los/webservice/EDocsService.asmx` |
-| **Method** | `DownloadEdocsPdfById` |
-| **Parameters** | `sTicket` (Bearer token), `docId` (document ID) |
-| **Returns** | Base64-encoded PDF content |
-
-### 5.4 Upload Document
-
-| Detail | Value |
-|--------|-------|
-| **Endpoint** | `POST https://playrunner.mortgage.meridianlink.com/los/webservice/EDocsService.asmx` |
-| **Method** | `UploadPDFDocument` |
-| **Parameters** | `sTicket`, `sLNm`, `documentType`, `notes`, `sDataContent` (base64 PDF) |
-| **Returns** | Upload confirmation |
+```
+Ocrolus-Generic-Framework/
+├── src/
+│   ├── app.js                          # Express server entry point
+│   ├── orchestrator.js                 # Pipeline coordinator (4-step flow)
+│   ├── config/
+│   │   └── index.js                    # Environment config
+│   ├── routes/
+│   │   ├── api.js                      # Dashboard + manual API endpoints
+│   │   └── generic-framework.js        # XML handshake + session endpoints
+│   └── services/
+│       ├── meridianlink-client.js      # MeridianLink API client (OAuth + Ticket)
+│       ├── mock-client.js              # Simulated MeridianLink (demo mode)
+│       └── document-processor.js       # Document processing (placeholder)
+├── public/
+│   ├── index.html                      # Admin dashboard
+│   ├── app.js                          # Dashboard frontend logic
+│   ├── styles.css                      # Dashboard styling
+│   ├── launch.html                     # Pop-up window (opened by MeridianLink)
+│   ├── launch-app.js                   # Pop-up frontend logic
+│   └── launch-styles.css               # Pop-up styling
+├── docs/
+│   ├── ARCHITECTURE.md                 # This document
+│   ├── PRD.md                          # Product requirements
+│   └── LOCAL_SETUP.md                  # Setup guide
+├── .env.example                        # Config template
+├── package.json                        # Dependencies
+└── README.md                           # Quick start
+```
 
 ---
 
-## 6. Operating Modes
+## 7. Authentication Methods
+
+The app supports two authentication methods:
+
+| Method | When Used | How It Works |
+|--------|-----------|-------------|
+| **EncryptedTicket** | When launched via Generic Framework pop-up | MeridianLink provides a 30-minute ticket in the XML handshake. Used as `sTicket` in API calls. |
+| **OAuth 2.0** | When triggered manually via dashboard | Uses `client_id` + `client_secret` to get a Bearer token (4-hour lifetime). |
+
+---
+
+## 8. Operating Modes
 
 | Mode | `USE_MOCK` | Description |
 |------|-----------|-------------|
-| **Simulated** | `true` | Uses realistic mock data — 5 sample mortgage documents. No live API needed. |
-| **Live** | `false` | Connects to MeridianLink PlayRunner sandbox via the Generic Framework. Requires valid `ML_CLIENT_ID` and `ML_CLIENT_SECRET`. |
+| **Simulated** | `true` | Uses 5 realistic mock mortgage documents. No live API needed. Perfect for demos. |
+| **Live** | `false` | Connects to MeridianLink via the Generic Framework. Requires API credentials. |
 
 ---
 
-## 7. Technology Stack
+## 9. Technology Stack
 
-| Component | Technology | Why |
-|-----------|-----------|-----|
-| Runtime | Node.js 18+ | Lightweight, cross-platform, great for API integrations |
-| Web Server | Express.js | Simple, widely used, easy for developers to understand |
-| API Client | Axios + fast-xml-parser | HTTP requests + XML response parsing for Generic Framework |
-| Dashboard | Plain HTML, CSS, JavaScript | No build tools needed — opens instantly in any browser |
-| Configuration | .env file | Industry-standard secure settings management |
+| Component | Technology |
+|-----------|-----------|
+| Runtime | Node.js 18+ |
+| Web Server | Express.js |
+| API Client | Axios + fast-xml-parser |
+| XML Parsing | fast-xml-parser |
+| Session IDs | uuid (v4) |
+| Frontend | Plain HTML, CSS, JavaScript |
+| Configuration | dotenv (.env file) |
 
 ---
 
-## 8. Security
+## 10. MeridianLink Setup (Client Side)
 
-- **Credentials never stored in code** — `.env` file excluded from version control
-- **OAuth tokens auto-refresh** — new token requested before expiry
-- **No sensitive data logged** — passwords and tokens redacted from console output
-- **HTTPS only** — all MeridianLink communication over encrypted connections
-- **Single domain** — Generic Framework uses one unified encrypted endpoint
+To enable Ocrolus inside MeridianLink, the client registers the vendor:
+
+| Setting | Value |
+|---------|-------|
+| **Navigate to** | Lender → System Configuration → Generic Framework Vendors |
+| **Vendor Name** | `Ocrolus` |
+| **Launch URL** | `https://your-deployed-url/api/generic-framework/launch` |
