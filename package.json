@@ -1,0 +1,32 @@
+{
+  "name": "ocrolus-integration-poc",
+  "version": "1.0.0",
+  "description": "Ocrolus Document Integration PoC — Generic Framework — Receive, Process, Return flow",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js"
+  },
+  "keywords": [
+    "ocrolus",
+    "meridianlink",
+    "mortgage",
+    "integration",
+    "generic-framework",
+    "poc"
+  ],
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "fast-xml-parser": "^4.5.0",
+    "multer": "^2.0.2",
+    "uuid": "^11.0.0"
+  }
+}
