@@ -14,7 +14,6 @@ const DocumentProcessor = require('./services/document-processor');
 
 class Orchestrator {
     constructor() {
-        // Select real or mock client based on config
         this.client = config.app.useMock
             ? new MockMeridianLinkClient()
             : new MeridianLinkClient();
@@ -26,9 +25,6 @@ class Orchestrator {
 
     /**
      * Execute the full integration pipeline for a loan.
-     *
-     * @param {string} loanNumber — MeridianLink loan identifier
-     * @returns {Object} — completed job record
      */
     async runIntegration(loanNumber) {
         const job = {
@@ -46,12 +42,12 @@ class Orchestrator {
         this.jobs.push(job);
 
         try {
-            // ── Step 1: Authenticate ──────────────────────
+            // Step 1: Authenticate
             this._updateStep(job, 'authenticate', 'in_progress', 'Authenticating with MeridianLink...');
             const authResult = await this.client.authenticate();
-            this._updateStep(job, 'authenticate', 'completed', `Authenticated — ticket obtained`);
+            this._updateStep(job, 'authenticate', 'completed', 'Authenticated — ticket obtained');
 
-            // ── Step 2: Receive (Fetch Documents) ─────────
+            // Step 2: Receive (Fetch Documents)
             this._updateStep(job, 'receive', 'in_progress', `Fetching documents for loan ${loanNumber}...`);
             const documents = await this.client.listDocuments(loanNumber);
 
@@ -79,7 +75,7 @@ class Orchestrator {
             );
             job.documentsReceived = downloadedDocs.length;
 
-            // ── Step 3: Process ───────────────────────────
+            // Step 3: Process
             this._updateStep(job, 'process', 'in_progress', `Processing ${downloadedDocs.length} documents...`);
             const processedDocs = await this.processor.processAll(downloadedDocs);
             this._updateStep(
@@ -90,7 +86,7 @@ class Orchestrator {
             );
             job.documentsProcessed = processedDocs.length;
 
-            // ── Step 4: Return (Upload Back) ──────────────
+            // Step 4: Return (Upload Back)
             this._updateStep(job, 'return', 'in_progress', `Uploading ${processedDocs.length} processed documents...`);
             const uploadResults = [];
             for (const doc of processedDocs) {
@@ -111,19 +107,19 @@ class Orchestrator {
             );
             job.documentsReturned = uploadResults.length;
 
-            // ── Complete ──────────────────────────────────
+            // Complete
             job.status = 'completed';
             job.completedAt = new Date().toISOString();
             job.duration = new Date(job.completedAt) - new Date(job.startedAt);
 
-            console.log(`\n[Orchestrator] ✅ Job ${job.id} completed in ${job.duration}ms`);
+            console.log(`\n[Orchestrator] Job ${job.id} completed in ${job.duration}ms`);
             console.log(`  Received: ${job.documentsReceived} | Processed: ${job.documentsProcessed} | Returned: ${job.documentsReturned}\n`);
 
         } catch (error) {
             job.status = 'failed';
             job.error = error.message;
             job.completedAt = new Date().toISOString();
-            console.error(`[Orchestrator] ❌ Job ${job.id} failed: ${error.message}`);
+            console.error(`[Orchestrator] Job ${job.id} failed: ${error.message}`);
 
             const inProgress = job.steps.find((s) => s.status === 'in_progress');
             if (inProgress) {
@@ -139,10 +135,6 @@ class Orchestrator {
     /**
      * Execute the pipeline with pre-loaded documents (e.g. from file upload).
      * Skips the MeridianLink fetch step — goes straight to Process → Return.
-     *
-     * @param {string} loanNumber — identifier for the job
-     * @param {Array} documents — array of { guid, name, type, content, size }
-     * @returns {Object} — completed job record
      */
     async runIntegrationWithDocuments(loanNumber, documents) {
         const job = {
@@ -160,12 +152,10 @@ class Orchestrator {
         this.jobs.push(job);
 
         try {
-            // ── Step 1: Authenticate (simulated for upload flow) ──
             this._updateStep(job, 'authenticate', 'in_progress', 'Authenticating (document upload mode)...');
             await new Promise((r) => setTimeout(r, 300));
             this._updateStep(job, 'authenticate', 'completed', 'Authenticated — document upload mode');
 
-            // ── Step 2: Receive (use uploaded documents) ──────────
             this._updateStep(job, 'receive', 'in_progress', `Receiving ${documents.length} uploaded document(s)...`);
             await new Promise((r) => setTimeout(r, 500));
 
@@ -184,7 +174,6 @@ class Orchestrator {
                 format: d.format,
             }));
 
-            // ── Step 3: Process ───────────────────────────
             this._updateStep(job, 'process', 'in_progress', `Processing ${documents.length} document(s)...`);
             const processedDocs = await this.processor.processAll(documents);
             this._updateStep(
@@ -195,7 +184,6 @@ class Orchestrator {
             );
             job.documentsProcessed = processedDocs.length;
 
-            // Store processing results for display
             job.processingResults = processedDocs.map((d) => ({
                 name: d.name,
                 type: d.type,
@@ -205,7 +193,6 @@ class Orchestrator {
                 processingTimeMs: d.metadata.processingTimeMs,
             }));
 
-            // ── Step 4: Return (Upload Back) ──────────────
             this._updateStep(job, 'return', 'in_progress', `Uploading ${processedDocs.length} processed document(s)...`);
             const uploadResults = [];
             for (const doc of processedDocs) {
@@ -226,12 +213,11 @@ class Orchestrator {
             );
             job.documentsReturned = uploadResults.length;
 
-            // ── Complete ──────────────────────────────────
             job.status = 'completed';
             job.completedAt = new Date().toISOString();
             job.duration = new Date(job.completedAt) - new Date(job.startedAt);
 
-            console.log(`\n[Orchestrator] ✅ Upload Job ${job.id} completed in ${job.duration}ms`);
+            console.log(`\n[Orchestrator] Upload Job ${job.id} completed in ${job.duration}ms`);
             console.log(`  Files: ${docNames}`);
             console.log(`  Received: ${job.documentsReceived} | Processed: ${job.documentsProcessed} | Returned: ${job.documentsReturned}\n`);
 
@@ -239,7 +225,7 @@ class Orchestrator {
             job.status = 'failed';
             job.error = error.message;
             job.completedAt = new Date().toISOString();
-            console.error(`[Orchestrator] ❌ Upload Job ${job.id} failed: ${error.message}`);
+            console.error(`[Orchestrator] Upload Job ${job.id} failed: ${error.message}`);
 
             const inProgress = job.steps.find((s) => s.status === 'in_progress');
             if (inProgress) {
@@ -262,6 +248,26 @@ class Orchestrator {
         }
     }
 
+    /**
+     * Execute the pipeline using a MeridianLink Generic Framework EncryptedTicket.
+     *
+     * When MeridianLink triggers the pop-up, it provides an EncryptedTicket
+     * (valid 30 min) that replaces OAuth for API calls.
+     */
+    async runIntegrationWithTicket(loanNumber, ticketXml) {
+        if (ticketXml && !this.client.constructor.name.includes('Mock')) {
+            this.client.setTicketOverride(ticketXml);
+        }
+
+        try {
+            return await this.runIntegration(loanNumber);
+        } finally {
+            if (this.client.clearTicketOverride) {
+                this.client.clearTicketOverride();
+            }
+        }
+    }
+
     /** Get current job status */
     getStatus() {
         if (this.currentJob) {
@@ -275,7 +281,7 @@ class Orchestrator {
         return [...this.jobs].reverse();
     }
 
-    // ── Internal Helpers ────────────────────────────────
+    // ── Internal Helpers ──────────────────────────────
 
     _updateStep(job, stepName, status, message) {
         const existing = job.steps.find((s) => s.name === stepName);
