@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Document processing pipeline — launched from MeridianLink" />
+    <title>Document Processing</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="launch-styles.css" />
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="launch-header">
+        <div class="launch-header__brand">
+            <div class="launch-header__logo">
+                <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+                    <rect width="32" height="32" rx="8" fill="url(#lg)" />
+                    <path d="M8 16L14 10L20 16L14 22Z" fill="white" opacity="0.9" />
+                    <path d="M14 16L20 10L26 16L20 22Z" fill="white" opacity="0.6" />
+                    <defs>
+                        <linearGradient id="lg" x1="0" y1="0" x2="32" y2="32">
+                            <stop stop-color="#ff6a00" />
+                            <stop offset="1" stop-color="#ff9f43" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <div>
+                <h1 class="launch-header__title" id="vendorTitle">Document Processing</h1>
+                <p class="launch-header__subtitle">MeridianLink Integration</p>
+            </div>
+        </div>
+        <div class="launch-header__badge" id="modeBadge">
+            <span class="launch-header__badge-dot"></span>
+            <span id="modeLabel">Connecting…</span>
+        </div>
+    </header>
+
+    <main class="launch-main">
+        <!-- Error State (no loan number) -->
+        <div class="launch-error hidden" id="errorState">
+            <div class="launch-error__icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="15" y1="9" x2="9" y2="15" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+            </div>
+            <h2 class="launch-error__title">Missing Loan Number</h2>
+            <p class="launch-error__desc">This page must be launched from MeridianLink with a loan number.</p>
+            <p class="launch-error__hint">Expected URL: <code>/launch?loanNumber=LN-2026-001</code></p>
+        </div>
+
+        <!-- Processing State -->
+        <div class="launch-processing" id="processingState">
+            <!-- Loan info -->
+            <div class="launch-loan">
+                <span class="launch-loan__label">Loan Number</span>
+                <span class="launch-loan__value" id="loanDisplay">—</span>
+            </div>
+
+            <!-- Pipeline steps -->
+            <div class="launch-pipeline" id="pipeline">
+                <div class="launch-step" id="lstep-authenticate" data-step="authenticate">
+                    <div class="launch-step__indicator">
+                        <div class="launch-step__circle">
+                            <svg class="launch-step__icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                            </svg>
+                            <svg class="launch-step__check" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2.5">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                        </div>
+                        <div class="launch-step__line"></div>
+                    </div>
+                    <div class="launch-step__content">
+                        <span class="launch-step__label">Authenticate</span>
+                        <span class="launch-step__detail" id="detail-authenticate">Waiting…</span>
+                    </div>
+                </div>
+
+                <div class="launch-step" id="lstep-receive" data-step="receive">
+                    <div class="launch-step__indicator">
+                        <div class="launch-step__circle">
+                            <svg class="launch-step__icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                            <svg class="launch-step__check" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2.5">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                        </div>
+                        <div class="launch-step__line"></div>
+                    </div>
+                    <div class="launch-step__content">
+                        <span class="launch-step__label">Receive Documents</span>
+                        <span class="launch-step__detail" id="detail-receive">Waiting…</span>
+                    </div>
+                </div>
+
+                <div class="launch-step" id="lstep-process" data-step="process">
+                    <div class="launch-step__indicator">
+                        <div class="launch-step__circle">
+                            <svg class="launch-step__icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3" />
+                                <path
+                                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.32 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                            </svg>
+                            <svg class="launch-step__check" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2.5">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                        </div>
+                        <div class="launch-step__line"></div>
+                    </div>
+                    <div class="launch-step__content">
+                        <span class="launch-step__label">Process Documents</span>
+                        <span class="launch-step__detail" id="detail-process">Waiting…</span>
+                    </div>
+                </div>
+
+                <div class="launch-step" id="lstep-return" data-step="return">
+                    <div class="launch-step__indicator">
+                        <div class="launch-step__circle">
+                            <svg class="launch-step__icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                            </svg>
+                            <svg class="launch-step__check" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2.5">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="launch-step__content">
+                        <span class="launch-step__label">Return to MeridianLink</span>
+                        <span class="launch-step__detail" id="detail-return">Waiting…</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary (shown after completion) -->
+            <div class="launch-summary hidden" id="summaryCard">
+                <div class="launch-summary__header" id="summaryHeader">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                    <span id="summaryTitle">Processing Complete</span>
+                </div>
+                <div class="launch-summary__stats">
+                    <div class="launch-summary__stat">
+                        <span class="launch-summary__stat-value" id="sumReceived">0</span>
+                        <span class="launch-summary__stat-label">Received</span>
+                    </div>
+                    <div class="launch-summary__stat">
+                        <span class="launch-summary__stat-value" id="sumProcessed">0</span>
+                        <span class="launch-summary__stat-label">Processed</span>
+                    </div>
+                    <div class="launch-summary__stat">
+                        <span class="launch-summary__stat-value" id="sumReturned">0</span>
+                        <span class="launch-summary__stat-label">Returned</span>
+                    </div>
+                    <div class="launch-summary__stat">
+                        <span class="launch-summary__stat-value" id="sumDuration">—</span>
+                        <span class="launch-summary__stat-label">Duration</span>
+                    </div>
+                </div>
+                <button class="launch-close-btn" id="closeBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Done — Close Window
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="launch-footer">
+        <p>Powered by <span id="footerVendor">Ocrolus</span> &middot; MeridianLink Generic Framework</p>
+    </footer>
+
+    <script src="launch-app.js"></script>
+</body>
+
+</html>
