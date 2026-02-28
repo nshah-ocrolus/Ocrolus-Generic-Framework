@@ -11,22 +11,9 @@ const path = require('path');
 const fs = require('fs');
 const router = express.Router();
 
-// Configure multer for file uploads
-const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadsDir),
-    filename: (req, file, cb) => {
-        const uniqueName = `${Date.now()}-${file.originalname}`;
-        cb(null, uniqueName);
-    },
-});
-
+// Configure multer — use memory storage (works on Vercel's read-only filesystem)
 const upload = multer({
-    storage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB max
     fileFilter: (req, file, cb) => {
         const allowed = ['.pdf', '.png', '.jpg', '.jpeg', '.tiff', '.tif'];
@@ -110,10 +97,8 @@ module.exports = function createRoutes(orchestrator) {
         }
 
         try {
-            // Read the uploaded file and convert to base64
-            const filePath = req.file.path;
-            const fileBuffer = fs.readFileSync(filePath);
-            const base64Content = fileBuffer.toString('base64');
+            // Read from memory buffer (not disk)
+            const base64Content = req.file.buffer.toString('base64');
             const ext = path.extname(req.file.originalname).toLowerCase();
 
             const uploadedDoc = {
@@ -130,15 +115,8 @@ module.exports = function createRoutes(orchestrator) {
 
             const job = await orchestrator.runIntegrationWithDocuments(loanNumber, [uploadedDoc]);
 
-            // Clean up uploaded file
-            fs.unlinkSync(filePath);
-
             res.json(job);
         } catch (error) {
-            // Clean up on error
-            if (req.file && fs.existsSync(req.file.path)) {
-                fs.unlinkSync(req.file.path);
-            }
             res.status(500).json({ error: error.message });
         }
     });

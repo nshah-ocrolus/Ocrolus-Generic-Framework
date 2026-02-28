@@ -37,7 +37,10 @@ function cleanExpiredSessions() {
     }
 }
 
-setInterval(cleanExpiredSessions, 5 * 60 * 1000);
+// Clean expired sessions periodically (local only — Vercel is stateless)
+if (!process.env.VERCEL) {
+    setInterval(cleanExpiredSessions, 5 * 60 * 1000);
+}
 
 module.exports = function createGenericFrameworkRoutes(orchestrator) {
     router.post('/launch', express.text({ type: ['text/xml', 'application/xml'] }), (req, res) => {
