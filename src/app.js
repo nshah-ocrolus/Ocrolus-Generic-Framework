@@ -10,6 +10,7 @@ const path = require('path');
 const config = require('./config');
 const Orchestrator = require('./orchestrator');
 const createRoutes = require('./routes/api');
+const createGenericFrameworkRoutes = require('./routes/generic-framework');
 
 const app = express();
 
@@ -24,6 +25,14 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // ── API Routes ──────────────────────────────────────
 const orchestrator = new Orchestrator();
 app.use('/api', createRoutes(orchestrator));
+
+// ── Generic Framework XML Handshake ─────────────────
+app.use('/api/generic-framework', createGenericFrameworkRoutes(orchestrator));
+
+// ── Launch URL (Pop-Up Integration) ─────────────────
+app.get('/launch', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'launch.html'));
+});
 
 // ── Fallback to dashboard ───────────────────────────
 app.get('*', (req, res) => {

@@ -13,18 +13,15 @@ const config = {
     port: parseInt(process.env.PORT, 10) || 3000,
     env: process.env.NODE_ENV || 'development',
     useMock: process.env.USE_MOCK === 'true',
+    vendorName: process.env.VENDOR_NAME || 'Ocrolus',
+    publicUrl: process.env.PUBLIC_URL || '',
   },
 
   meridianlink: {
-    // OAuth credentials (required for live API)
     clientId: process.env.ML_CLIENT_ID || '',
     clientSecret: process.env.ML_CLIENT_SECRET || '',
     oauthUrl: process.env.ML_OAUTH_URL || 'https://playrunner.mortgage.meridianlink.com/oauth/token',
-
-    // Generic Framework base domain (single unified endpoint)
     baseDomain: process.env.ML_BASE_DOMAIN || 'https://playrunner.mortgage.meridianlink.com',
-
-    // Legacy credentials (kept for reference / fallback)
     username: process.env.ML_USERNAME || '',
     password: process.env.ML_PASSWORD || '',
     apiKey: process.env.ML_API_KEY || '',
