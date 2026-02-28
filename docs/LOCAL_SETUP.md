@@ -1,8 +1,8 @@
 # Local Setup Guide
 
-## MeridianLink Generic Framework Integration PoC
+## Ocrolus — MeridianLink Generic Framework Integration
 
-Step-by-step guide to run the MeridianLink Generic Framework Integration PoC on your local machine. No prior knowledge of the codebase is needed.
+Step-by-step guide to run the Ocrolus–MeridianLink Generic Framework Integration PoC on your local machine.
 
 ---
 
@@ -10,16 +10,15 @@ Step-by-step guide to run the MeridianLink Generic Framework Integration PoC on 
 
 | Tool | Version | How to Install |
 |------|---------|----------------|
-| **Node.js** | v18+ | [nodejs.org](https://nodejs.org/) — choose LTS. Mac: `brew install node` |
+| **Node.js** | v18+ | [nodejs.org](https://nodejs.org/) — choose LTS |
 | **npm** | v9+ | Included with Node.js |
-| **Git** | Any | Mac: `xcode-select --install`. Windows/Linux: [git-scm.com](https://git-scm.com/) |
+| **Git** | Any | [git-scm.com](https://git-scm.com/) |
 
 **Verify installation:**
 
 ```bash
 node -v      # Should show v18.x.x or higher
 npm -v       # Should show 9.x.x or higher
-git --version
 ```
 
 ---
@@ -48,13 +47,15 @@ npm start
 
 ## Configuration
 
-The application reads settings from a `.env` file. Key settings:
+The application reads settings from a `.env` file.
 
-### Mock Mode (Default)
+### Mock Mode (Default — No API Needed)
 
 ```env
-USE_MOCK=true    # Uses simulated MeridianLink data — no API access needed
-PORT=4000        # Server port
+USE_MOCK=true
+PORT=4000
+VENDOR_NAME=Ocrolus
+PUBLIC_URL=http://localhost:4000
 ```
 
 ### Live Mode (When API Credentials Are Available)
@@ -66,84 +67,86 @@ USE_MOCK=false
 ML_CLIENT_ID=your_client_id
 ML_CLIENT_SECRET=your_client_secret
 
-# Generic Framework endpoint
+# Generic Framework endpoints
 ML_OAUTH_URL=https://playrunner.mortgage.meridianlink.com/oauth/token
 ML_BASE_DOMAIN=https://playrunner.mortgage.meridianlink.com
+
+# Your public URL (where MeridianLink can reach your app)
+PUBLIC_URL=https://your-deployed-url.com
 ```
 
 ---
 
-## Running the Application
+## Testing the Pop-Up Integration
 
-### Start the Server
+### Option 1: Simulate the MeridianLink XML Handshake
+
+You can test the full Generic Framework flow locally using curl:
 
 ```bash
-npm start
+# Send a simulated MeridianLink XML request
+curl -X POST http://localhost:4000/api/generic-framework/launch \
+  -H "Content-Type: text/xml" \
+  -d '<?xml version="1.0" encoding="utf-8"?>
+<LQBGenericFrameworkRequest>
+  <LoanNumber>TEST-LOAN-001</LoanNumber>
+  <UserLogin>testuser</UserLogin>
+  <LendingQBLoanCredential>
+    <GENERIC_FRAMEWORK_USER_TICKET EncryptedTicket="demo-ticket-123" />
+  </LendingQBLoanCredential>
+</LQBGenericFrameworkRequest>'
 ```
 
-You'll see:
+This returns an XML response with a PopupURL. Open that URL in your browser to see the pop-up.
+
+### Option 2: Direct Pop-Up URL
+
+Open this URL directly in your browser:
 
 ```
-╔══════════════════════════════════════════════════════╗
-║   MeridianLink Integration PoC                      ║
-╠══════════════════════════════════════════════════════╣
-║   Server:    http://localhost:4000                   ║
-║   Mode:      SIMULATED (mock)                       ║
-║   Env:       development                            ║
-╚══════════════════════════════════════════════════════╝
+http://localhost:4000/launch?loanNumber=TEST-001
 ```
 
-### Using the Dashboard
+This shows the pop-up window without the XML handshake (simple launch mode).
+
+### Option 3: Admin Dashboard
 
 1. Open [http://localhost:4000](http://localhost:4000)
-2. Enter a loan number (defaults to `TEST-001`)
+2. Enter a loan number
 3. Click **"Run Integration"**
-4. Watch the 4-step pipeline execute:
-   - **Authenticate** → Obtains Generic Framework OAuth token
-   - **Receive** → Fetches 5 sample mortgage documents
-   - **Process** → Applies processing stamps
-   - **Return** → Uploads processed documents back
-5. Takes ~15 seconds in mock mode
-6. Green success message with document counts appears
-
-### Testing with Real Documents
-
-1. Scroll to **"Test With Real Document"** section
-2. Drag & drop a PDF (or click to browse)
-3. Enter a loan number
-4. Click **"Upload & Process"**
-5. The document goes through the full Receive → Process → Return pipeline
-
-### Command Line Testing (Optional)
-
-```bash
-# Health check
-curl http://localhost:4000/api/health
-
-# Run pipeline
-curl -X POST http://localhost:4000/api/integration/run \
-  -H "Content-Type: application/json" \
-  -d '{"loanNumber": "TEST-001"}'
-
-# View history
-curl http://localhost:4000/api/integration/history
-```
+4. Watch the 4-step pipeline execute in real-time
 
 ---
 
-## Switching to Live Mode
+## What You'll See
 
-When MeridianLink provides Generic Framework API credentials:
+### Pop-Up Window (launched by MeridianLink)
 
-1. Open `.env`
-2. Set `USE_MOCK=false`
-3. Add your OAuth credentials:
-   ```env
-   ML_CLIENT_ID=your_client_id
-   ML_CLIENT_SECRET=your_client_secret
-   ```
-4. Save and restart: `Ctrl+C` then `npm start`
-5. Dashboard shows **"Live"** instead of **"Mock Mode"**
+The pop-up shows 4 pipeline steps with live progress:
+
+1. **Authenticate** — Connects to MeridianLink
+2. **Receive Documents** — Fetches 5 sample mortgage documents
+3. **Process Documents** — Processes each document
+4. **Return to MeridianLink** — Uploads processed documents back
+
+After completion, you see a summary with document counts and a "Done — Close Window" button.
+
+### Admin Dashboard
+
+The dashboard at [http://localhost:4000](http://localhost:4000) shows:
+- Manual pipeline trigger
+- Real-time job progress
+- Job history with document counts and durations
+
+---
+
+## Deploying for MeridianLink Integration
+
+To connect this to a real MeridianLink instance:
+
+1. **Deploy the app online** (Vercel, Railway, Render, etc.)
+2. **Set the `PUBLIC_URL`** environment variable to your deployed URL
+3. **Register in MeridianLink**: Lender → System Config → Generic Framework Vendors → Add `Ocrolus` with your Launch URL
 
 ---
 
@@ -153,22 +156,27 @@ When MeridianLink provides Generic Framework API credentials:
 Ocrolus-Generic-Framework/
 ├── src/
 │   ├── app.js                          # Express server entry point
-│   ├── orchestrator.js                 # Pipeline coordinator
+│   ├── orchestrator.js                 # Pipeline coordinator (4-step flow)
 │   ├── config/
-│   │   └── index.js                    # Environment config loader
+│   │   └── index.js                    # Environment config
+│   ├── routes/
+│   │   ├── api.js                      # Dashboard + manual API endpoints
+│   │   └── generic-framework.js        # XML handshake + session endpoints
 │   └── services/
-│       ├── meridianlink-client.js      # Generic Framework API client
-│       ├── mock-client.js              # Simulated MeridianLink client
+│       ├── meridianlink-client.js      # MeridianLink API client
+│       ├── mock-client.js              # Simulated MeridianLink (demo mode)
 │       └── document-processor.js       # Document processing (placeholder)
 ├── public/
-│   ├── index.html                      # Dashboard HTML
+│   ├── index.html                      # Admin dashboard
 │   ├── app.js                          # Dashboard frontend logic
-│   └── styles.css                      # Dashboard styling
+│   ├── styles.css                      # Dashboard styling
+│   ├── launch.html                     # Pop-up window (opened by MeridianLink)
+│   ├── launch-app.js                   # Pop-up frontend logic
+│   └── launch-styles.css               # Pop-up styling
 ├── docs/
 │   ├── ARCHITECTURE.md                 # System architecture
 │   ├── PRD.md                          # Product requirements
 │   └── LOCAL_SETUP.md                  # This file
-├── .env                                # Environment configuration
 ├── .env.example                        # Config template
 ├── package.json                        # Dependencies
 └── README.md                           # Quick start
@@ -184,8 +192,7 @@ Ocrolus-Generic-Framework/
 | **`EADDRINUSE: port 4000`** | Another app is using port 4000. Change `PORT=4001` in `.env` |
 | **`Cannot find module`** | Run `npm install` in the project folder |
 | **Dashboard shows "Offline"** | Server isn't running — run `npm start` |
-| **Pipeline fails in Live mode** | Check `ML_CLIENT_ID` and `ML_CLIENT_SECRET` in `.env` |
-| **OAuth token error** | Verify `ML_OAUTH_URL` points to `playrunner.mortgage.meridianlink.com/oauth/token` |
+| **Pop-up shows "Missing Loan Number"** | Open with `?loanNumber=TEST-001` in the URL |
 
 ---
 
@@ -196,5 +203,5 @@ Ocrolus-Generic-Framework/
 | Install dependencies | `npm install` |
 | Start server | `npm start` |
 | Open dashboard | `http://localhost:4000` |
+| Test pop-up | `http://localhost:4000/launch?loanNumber=TEST-001` |
 | Stop server | `Ctrl + C` |
-| Development mode | `npm run dev` (auto-restarts on file changes) |
