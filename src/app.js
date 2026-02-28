@@ -17,10 +17,15 @@ const app = express();
 // ── Middleware ───────────────────────────────────────
 app.use(cors());
 app.use(express.json());
+app.use(express.text({ type: 'text/xml' }));
+app.use(express.text({ type: 'application/xml' }));
 app.use(express.urlencoded({ extended: true }));
 
+// ── Resolve public directory (works both locally and on Vercel) ──
+const publicDir = path.join(__dirname, '..', 'public');
+
 // ── Static Dashboard ────────────────────────────────
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(publicDir));
 
 // ── API Routes ──────────────────────────────────────
 const orchestrator = new Orchestrator();
@@ -31,20 +36,20 @@ app.use('/api/generic-framework', createGenericFrameworkRoutes(orchestrator));
 
 // ── Launch URL (Pop-Up Integration) ─────────────────
 app.get('/launch', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'launch.html'));
+    res.sendFile(path.join(publicDir, 'launch.html'));
+});
+
+// ── Fallback to dashboard ───────────────────────────
+app.get('*', (req, res) => {
+    res.sendFile(path.join(publicDir, 'index.html'));
 });
 
 // ── Start Server (only when running locally, not on Vercel) ──
 if (!process.env.VERCEL) {
-    // Fallback to dashboard (local only — Vercel handles this via vercel.json)
-    app.get('*', (req, res) => {
-        res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-    });
-
     app.listen(config.app.port, () => {
         console.log('');
         console.log('╔══════════════════════════════════════════════════════╗');
-        console.log('║   MeridianLink Integration PoC                      ║');
+        console.log('║   Ocrolus — MeridianLink Integration PoC            ║');
         console.log('╠══════════════════════════════════════════════════════╣');
         console.log(`║   Server:    http://localhost:${config.app.port}                 ║`);
         console.log(`║   Mode:      ${config.app.useMock ? 'SIMULATED (mock)' : 'LIVE (MeridianLink API)'}            ║`);
