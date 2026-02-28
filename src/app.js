@@ -39,17 +39,19 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-// ── Start Server ────────────────────────────────────
-app.listen(config.app.port, () => {
-    console.log('');
-    console.log('╔══════════════════════════════════════════════════════╗');
-    console.log('║   MeridianLink Integration PoC                      ║');
-    console.log('╠══════════════════════════════════════════════════════╣');
-    console.log(`║   Server:    http://localhost:${config.app.port}                 ║`);
-    console.log(`║   Mode:      ${config.app.useMock ? 'SIMULATED (mock)' : 'LIVE (MeridianLink API)'}            ║`);
-    console.log(`║   Env:       ${config.app.env}                      ║`);
-    console.log('╚══════════════════════════════════════════════════════╝');
-    console.log('');
-});
+// ── Start Server (only when running locally, not on Vercel) ──
+if (!process.env.VERCEL) {
+    app.listen(config.app.port, () => {
+        console.log('');
+        console.log('╔══════════════════════════════════════════════════════╗');
+        console.log('║   MeridianLink Integration PoC                      ║');
+        console.log('╠══════════════════════════════════════════════════════╣');
+        console.log(`║   Server:    http://localhost:${config.app.port}                 ║`);
+        console.log(`║   Mode:      ${config.app.useMock ? 'SIMULATED (mock)' : 'LIVE (MeridianLink API)'}            ║`);
+        console.log(`║   Env:       ${config.app.env}                      ║`);
+        console.log('╚══════════════════════════════════════════════════════╝');
+        console.log('');
+    });
+}
 
 module.exports = app;
