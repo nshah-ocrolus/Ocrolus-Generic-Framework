@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Document processing pipeline — launched from MeridianLink" />
-    <title>Document Processing</title>
+    <meta name="description" content="Ocrolus — Document processing pipeline for MeridianLink" />
+    <title>Ocrolus — Document Processing</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -15,7 +15,7 @@
 </head>
 
 <body>
-    <!-- Header -->
+    <!-- ─── Header ────────────────────────────────────── -->
     <header class="launch-header">
         <div class="launch-header__brand">
             <div class="launch-header__logo">
@@ -32,7 +32,7 @@
                 </svg>
             </div>
             <div>
-                <h1 class="launch-header__title" id="vendorTitle">Document Processing</h1>
+                <h1 class="launch-header__title" id="vendorTitle">Ocrolus</h1>
                 <p class="launch-header__subtitle">MeridianLink Integration</p>
             </div>
         </div>
@@ -43,7 +43,7 @@
     </header>
 
     <main class="launch-main">
-        <!-- Error State (no loan number) -->
+        <!-- ─── Error State (no loan number) ────────────── -->
         <div class="launch-error hidden" id="errorState">
             <div class="launch-error__icon">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -57,7 +57,7 @@
             <p class="launch-error__hint">Expected URL: <code>/launch?loanNumber=LN-2026-001</code></p>
         </div>
 
-        <!-- Processing State -->
+        <!-- ─── Processing State ────────────────────────── -->
         <div class="launch-processing" id="processingState">
             <!-- Loan info -->
             <div class="launch-loan">
@@ -193,7 +193,7 @@
     </main>
 
     <footer class="launch-footer">
-        <p>Powered by <span id="footerVendor">Ocrolus</span> &middot; MeridianLink Generic Framework</p>
+        <p>Powered by <span id="footerVendor">Ocrolus</span> &middot; MeridianLink Integration</p>
     </footer>
 
     <script src="launch-app.js"></script>
